@@ -1,86 +1,86 @@
-import React, { useRef, useState,useMemo, useEffect } from 'react'
+import React, { useRef, useState, useEffect, useMemo } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Text, Stars , Box} from '@react-three/drei'
+import { OrbitControls, Text, Stars } from '@react-three/drei'
 import { EffectComposer, Bloom, Noise, Vignette } from '@react-three/postprocessing'
 import * as THREE from 'three'
-import CircularEqualizer from './CircularEqualizer'
-const AudioSphere = ({ frequencies }) => {
-    const sphereRef = useRef()
-    const [color, setColor] = useState('#ffffff')
-  
-    useFrame(() => {
-      if (sphereRef.current) {
-        const averageFrequency = frequencies.reduce((a, b) => a + b) / frequencies.length
-        sphereRef.current.scale.setScalar(1 + averageFrequency / 255 * 0.3)
-        
-        // Change color based on average frequency
-        const hue = (averageFrequency / 255) * 360
-        setColor(`hsl(${hue}, 100%, 50%)`)
-      }
-    })
-  
-    return (
-      <mesh ref={sphereRef}>
-        <sphereGeometry args={[2, 32, 32]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.5} wireframe />
-      </mesh>
-    )
-  }
-  
-  const FloatingCube = ({ position }) => {
-    const cubeRef = useRef()
-  
-    useFrame(({ clock }) => {
-      const t = clock.getElapsedTime()
-      cubeRef.current.position.y = position[1] + Math.sin(t * 2) * 0.5
-      cubeRef.current.rotation.x = t * 0.5
-      cubeRef.current.rotation.y = t * 0.3
-    })
-  
-    return (
-      <Box ref={cubeRef} position={position} args={[1, 1, 1]}>
-        <meshStandardMaterial color="#00ff00" emissive="#00ff00" emissiveIntensity={0.5} />
-      </Box>
-    )
-  }
-  
-  const AudioRings = ({ frequencies }) => {
-    const ringsRef = useRef()
-  
-    useFrame(() => {
-      if (ringsRef.current) {
-        ringsRef.current.rotation.z += 0.005
-        const averageFrequency = frequencies.reduce((a, b) => a + b) / frequencies.length
-        ringsRef.current.scale.setScalar(1 + averageFrequency / 255 * 0.2)
-      }
-    })
-  
-    const ringGeometry = useMemo(() => new THREE.RingGeometry(2.5, 2.7, 128), [])
-  
-    return (
-      <group ref={ringsRef}>
-        {[0, 1, 2].map((index) => (
-          <mesh key={index} position={[0, 0, index * 0.5]} rotation={[Math.PI / 2, 0, 0]}>
-            <primitive object={ringGeometry} />
-            <meshStandardMaterial color="#ff00ff" emissive="#ff00ff" emissiveIntensity={0.5} side={THREE.DoubleSide} />
-          </mesh>
-        ))}
-      </group>
-    )
-  }
-  
-  const AudioAnalyzer = ({ analyser, dataArray, setFrequencies }) => {
-    useFrame(() => {
-      if (analyser && dataArray) {
-        analyser.getByteFrequencyData(dataArray)
-        setFrequencies([...dataArray])
-      }
-    })
-  
-    return null
-  }
 
-  
+const AudioBar = ({ position, color, scale }) => {
+  const meshRef = useRef()
+
+  useFrame(() => {
+    if (meshRef.current) {
+      meshRef.current.scale.y = 1 + scale * 3
+      meshRef.current.position.y = (meshRef.current.scale.y - 1) / 2
+    }
+  })
+
+  return (
+    <mesh ref={meshRef} position={position}>
+      <boxGeometry args={[0.3, 1, 0.3]} />
+      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.5} />
+    </mesh>
+  )
+}
+
+const WaveForm = ({ frequencies, color }) => {
+  const lineRef = useRef()
+  const curve = useMemo(() => new THREE.EllipseCurve(0, 0, 10, 10, 0, 2 * Math.PI, false, 0), [])
+  const points = useMemo(() => curve.getPoints(256), [curve])
+
+  const lineGeometry = useMemo(() => {
+    const geometry = new THREE.BufferGeometry().setFromPoints(points)
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Array(256 * 3).fill(0), 3))
+    return geometry
+  }, [points])
+
+  useFrame(() => {
+    if (lineRef.current) {
+      const positions = lineRef.current.geometry.attributes.position
+      for (let i = 0; i < 256; i++) {
+        const t = i / 255
+        const [x, y] = curve.getPoint(t).toArray()
+        const z = (frequencies[Math.floor(i / 2) % frequencies.length] / 255) * 2
+        positions.setXYZ(i, x, y, z)
+      }
+      positions.needsUpdate = true
+    }
+  })
+
+  return (
+    <line ref={lineRef} geometry={lineGeometry}>
+      <lineBasicMaterial color={color} linewidth={2} />
+    </line>
+  )
+}
+const AudioSphere = ({ frequencies }) => {
+  const sphereRef = useRef()
+
+  useFrame(() => {
+    if (sphereRef.current) {
+      const averageFrequency = frequencies.reduce((a, b) => a + b) / frequencies.length
+      sphereRef.current.scale.setScalar(1 + averageFrequency / 255)
+    }
+  })
+
+  return (
+    <mesh ref={sphereRef}>
+      <sphereGeometry args={[2, 32, 32]} />
+      <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.2} wireframe />
+    </mesh>
+  )
+}
+
+const AudioAnalyzer = ({ analyser, dataArray, setFrequencies }) => {
+  useFrame(() => {
+    if (analyser && dataArray) {
+      analyser.getByteFrequencyData(dataArray)
+      setFrequencies([...dataArray])
+    }
+  })
+
+  return null
+}
+
 const AudioVisualizer = () => {
   const [audio, setAudio] = useState(null)
   const [analyser, setAnalyser] = useState(null)
@@ -135,10 +135,9 @@ const AudioVisualizer = () => {
     setVolume(parseFloat(event.target.value))
   }
 
-
   return (
     <div className="w-full h-screen bg-black">
-       <div className="absolute top-0 left-0 z-10 p-4 bg-gray-800 bg-opacity-75 rounded-br-lg">
+      <div className="absolute top-0 left-0 z-10 p-4 bg-gray-800 bg-opacity-75 rounded-br-lg">
         <input
           type="file"
           accept="audio/*"
@@ -164,7 +163,7 @@ const AudioVisualizer = () => {
           <span className="text-white">{Math.round(volume * 100)}%</span>
         </div>
       </div>
-      <Canvas camera={{ position: [0, 15, 25], fov: 60 }}>
+      <Canvas camera={{ position: [0, 0, 25], fov: 60 }}>
         <AudioAnalyzer
           analyser={analyser}
           dataArray={dataArray}
@@ -174,15 +173,18 @@ const AudioVisualizer = () => {
         <ambientLight intensity={0.2} />
         <pointLight position={[10, 10, 10]} intensity={1} />
         <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
-        
-        <CircularEqualizer frequencies={frequencies} />
+        <group rotation={[0, 0, Math.PI / 2]}>
+          {frequencies.slice(0, 64).map((freq, index) => (
+            <AudioBar
+              key={index}
+              position={[(index - 32) * 0.3, 0, 0]}
+              color={new THREE.Color().setHSL(index / 64, 1, 0.5)}
+              scale={freq / 255}
+            />
+          ))}
+        </group>
+        <WaveForm frequencies={frequencies} color="#00ffff" />
         <AudioSphere frequencies={frequencies} />
-        <AudioRings frequencies={frequencies} />
-        
-        <FloatingCube position={[0, 5, 0]} />
-        <FloatingCube position={[-5, 5, 0]} />
-        <FloatingCube position={[5, 5, 0]} />
-
         <Text
           position={[0, 10, 0]}
           color="white"
@@ -197,7 +199,7 @@ const AudioVisualizer = () => {
         >
           Audio Visualizer
         </Text>
-        <OrbitControls enableZoom={true} enablePan={false} />
+        <OrbitControls enableZoom={false} enablePan={false} />
         <EffectComposer>
           <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} height={300} />
           <Noise opacity={0.02} />
