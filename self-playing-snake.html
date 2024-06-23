@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Self-Playing Snake Game</title>
+    <title>Ultra Fancy Self-Playing Snake Game</title>
     <style>
         body {
             display: flex;
@@ -11,31 +11,70 @@
             align-items: center;
             height: 100vh;
             margin: 0;
-            background-color: #f0f0f0;
-            font-family: Arial, sans-serif;
+            background: #000;
+            font-family: 'Arial', sans-serif;
+            color: #fff;
+            overflow: hidden;
         }
         #game-container {
             text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+            position: relative;
+            z-index: 1;
         }
         #gameCanvas {
-            border: 2px solid #333;
+            border: 2px solid #00ff00;
+            border-radius: 5px;
+            box-shadow: 0 0 10px #00ff00;
         }
-        #score {
+        #score, #high-score {
             font-size: 24px;
             margin-top: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        #high-score {
+            color: #ff00ff;
+        }
+        #particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        #game-container {
+            animation: pulse 2s infinite;
         }
     </style>
 </head>
 <body>
+    <canvas id="particles"></canvas>
     <div id="game-container">
         <canvas id="gameCanvas" width="400" height="400"></canvas>
         <div id="score">Score: 0</div>
+        <div id="high-score">High Score: 0</div>
     </div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const scoreElement = document.getElementById('score');
+        const highScoreElement = document.getElementById('high-score');
+        const particlesCanvas = document.getElementById('particles');
+        const particlesCtx = particlesCanvas.getContext('2d');
+
+        particlesCanvas.width = window.innerWidth;
+        particlesCanvas.height = window.innerHeight;
 
         const gridSize = 20;
         const tileCount = canvas.width / gridSize;
@@ -47,6 +86,43 @@
         let dx = 0;
         let dy = 0;
         let score = 0;
+        let highScore = 0;
+
+        // Particle system
+        let particles = [];
+
+        function createParticle(x, y, color) {
+            return {
+                x: x,
+                y: y,
+                size: Math.random() * 5 + 1,
+                color: color,
+                speedX: Math.random() * 3 - 1.5,
+                speedY: Math.random() * 3 - 1.5
+            };
+        }
+
+        function updateParticles() {
+            particles.forEach((particle, index) => {
+                particle.x += particle.speedX;
+                particle.y += particle.speedY;
+                particle.size *= 0.95;
+
+                if (particle.size < 0.1) {
+                    particles.splice(index, 1);
+                }
+            });
+        }
+
+        function drawParticles() {
+            particlesCtx.clearRect(0, 0, particlesCanvas.width, particlesCanvas.height);
+            particles.forEach(particle => {
+                particlesCtx.fillStyle = particle.color;
+                particlesCtx.beginPath();
+                particlesCtx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                particlesCtx.fill();
+            });
+        }
 
         function getRandomFoodPosition() {
             return {
@@ -63,11 +139,13 @@
             drawFood();
             updateScore();
             chooseDirection();
-            setTimeout(drawGame, 100);
+            updateParticles();
+            drawParticles();
+            requestAnimationFrame(drawGame);
         }
 
         function clearCanvas() {
-            ctx.fillStyle = 'white';
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
@@ -77,8 +155,26 @@
             if (head.x === food.x && head.y === food.y) {
                 score++;
                 food = getRandomFoodPosition();
+                growSnake();
+                createFoodParticles();
             } else {
                 snake.pop();
+            }
+        }
+
+        function growSnake() {
+            for (let i = 0; i < 3; i++) {
+                snake.push({ ...snake[snake.length - 1] });
+            }
+        }
+
+        function createFoodParticles() {
+            for (let i = 0; i < 20; i++) {
+                particles.push(createParticle(
+                    (food.x + 0.5) * gridSize,
+                    (food.y + 0.5) * gridSize,
+                    `hsl(${Math.random() * 360}, 100%, 50%)`
+                ));
             }
         }
 
@@ -95,19 +191,63 @@
         }
 
         function drawSnake() {
-            ctx.fillStyle = 'green';
-            snake.forEach(segment => {
-                ctx.fillRect(segment.x * gridSize, segment.y * gridSize, gridSize - 2, gridSize - 2);
+            snake.forEach((segment, index) => {
+                const hue = (Date.now() / 20 + index * 10) % 360;
+                ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
+                ctx.beginPath();
+                ctx.arc((segment.x + 0.5) * gridSize, (segment.y + 0.5) * gridSize, gridSize / 2 - 1, 0, 2 * Math.PI);
+                ctx.fill();
+
+                // Glowing effect
+                ctx.shadowColor = `hsl(${hue}, 100%, 50%)`;
+                ctx.shadowBlur = 10;
+                ctx.fill();
+                ctx.shadowBlur = 0;
             });
         }
 
         function drawFood() {
-            ctx.fillStyle = 'red';
-            ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 2, gridSize - 2);
+            const gradient = ctx.createRadialGradient(
+                (food.x + 0.5) * gridSize, (food.y + 0.5) * gridSize, 0,
+                (food.x + 0.5) * gridSize, (food.y + 0.5) * gridSize, gridSize / 2
+            );
+            gradient.addColorStop(0, '#ff0');
+            gradient.addColorStop(1, '#f00');
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc((food.x + 0.5) * gridSize, (food.y + 0.5) * gridSize, gridSize / 2 - 1, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Pulsating effect
+            ctx.strokeStyle = 'rgba(255, 255, 255, ' + (0.5 + Math.sin(Date.now() / 200) * 0.5) + ')';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Glowing effect
+            ctx.shadowColor = '#ff0';
+            ctx.shadowBlur = 20;
+            ctx.fill();
+            ctx.shadowBlur = 0;
         }
 
         function updateScore() {
             scoreElement.textContent = `Score: ${score}`;
+            if (score > highScore) {
+                highScore = score;
+                highScoreElement.textContent = `High Score: ${highScore}`;
+                createHighScoreParticles();
+            }
+        }
+
+        function createHighScoreParticles() {
+            for (let i = 0; i < 50; i++) {
+                particles.push(createParticle(
+                    Math.random() * particlesCanvas.width,
+                    Math.random() * particlesCanvas.height,
+                    `hsl(${Math.random() * 360}, 100%, 50%)`
+                ));
+            }
         }
 
         function resetGame() {
@@ -116,6 +256,17 @@
             dx = 0;
             dy = 0;
             score = 0;
+            createResetParticles();
+        }
+
+        function createResetParticles() {
+            for (let i = 0; i < 100; i++) {
+                particles.push(createParticle(
+                    Math.random() * particlesCanvas.width,
+                    Math.random() * particlesCanvas.height,
+                    `hsl(0, 100%, ${Math.random() * 50 + 50}%)`
+                ));
+            }
         }
 
         function chooseDirection() {
@@ -145,7 +296,38 @@
             }
         }
 
-        drawGame();
+        // Background star effect
+        function createStars() {
+            for (let i = 0; i < 100; i++) {
+                particles.push({
+                    x: Math.random() * particlesCanvas.width,
+                    y: Math.random() * particlesCanvas.height,
+                    size: Math.random() * 2,
+                    color: 'white',
+                    speedX: 0,
+                    speedY: 0.1 + Math.random() * 0.5
+                });
+            }
+        }
+
+        function updateStars() {
+            particles.forEach(star => {
+                star.y += star.speedY;
+                if (star.y > particlesCanvas.height) {
+                    star.y = 0;
+                    star.x = Math.random() * particlesCanvas.width;
+                }
+            });
+        }
+
+        createStars();
+
+        function gameLoop() {
+            drawGame();
+            updateStars();
+        }
+
+        gameLoop();
     </script>
 </body>
 </html>
