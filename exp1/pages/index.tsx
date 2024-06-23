@@ -1,8 +1,9 @@
 import Image from "next/image";
 import { Inter } from "next/font/google";
-import NeuralNetwork from "../components/NeuralNetwork"
+import dynamic from 'next/dynamic'
 
-const inter = Inter({ subsets: ["latin"] });
+
+const NeuralNetwork = dynamic(() => import('../components/NeuralNetwork'), { ssr: false })
 
 export default function Home() {
   return (
