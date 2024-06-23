@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aaawards - Celebrating Digital Excellence</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #0a0a0a;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+        .content {
+            position: relative;
+            z-index: 1;
+        }
+        section {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            opacity: 0;
+            transform: translateY(50px);
+            transition: opacity 0.5s, transform 0.5s;
+        }
+        section.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        h1 {
+            font-size: 5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            letter-spacing: -2px;
+            background: linear-gradient(45deg, #ff3366, #ff6b6b, #feca57, #48dbfb, #ff9ff3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        p {
+            font-size: 1.5rem;
+            max-width: 600px;
+            line-height: 1.6;
+        }
+        .menu {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            z-index: 100;
+        }
+        .menu a {
+            color: #ffffff;
+            text-decoration: none;
+            margin-left: 1rem;
+            font-size: 1.2rem;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+        .menu a:hover {
+            color: #ff3366;
+        }
+        .award-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 2rem;
+            margin: 1rem;
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s;
+        }
+        .award-card:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <div class="menu">
+        <a href="#home">Home</a>
+        <a href="#categories">Categories</a>
+        <a href="#winners">Winners</a>
+    </div>
+
+    <div class="content">
+        <section id="home">
+            <div>
+                <h1>Aaawards</h1>
+                <p>Celebrating Digital Excellence</p>
+            </div>
+        </section>
+
+        <section id="categories">
+            <div>
+                <h1>Award Categories</h1>
+                <div class="award-card">
+                    <h2>Best Website Design</h2>
+                    <p>Recognizing outstanding visual and user experience in web design</p>
+                </div>
+                <div class="award-card">
+                    <h2>Most Innovative App</h2>
+                    <p>Honoring groundbreaking mobile applications</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="winners">
+            <div>
+                <h1>Previous Winners</h1>
+                <div class="award-card">
+                    <h2>2023 Winner: PixelPerfect</h2>
+                    <p>A revolutionary design tool that redefined industry standards</p>
+                </div>
+                <div class="award-card">
+                    <h2>2022 Winner: EcoTrack</h2>
+                    <p>An app that gamified sustainable living and inspired millions</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.4/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.4/ScrollTrigger.min.js"></script>
+
+    <script>
+        // (Keep the existing Three.js and GSAP setup)
+
+        // Scroll-based section activation
+        const sections = document.querySelectorAll('section');
+        const observerOptions = {
+            root: null,
+            rootMargin: '0px',
+            threshold: 0.5
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('active');
+                } else {
+                    entry.target.classList.remove('active');
+                }
+            });
+        }, observerOptions);
+
+        sections.forEach(section => {
+            observer.observe(section);
+        });
+
+        // Award card animations
+        gsap.utils.toArray('.award-card').forEach((card, i) => {
+            gsap.from(card, {
+                opacity: 0,
+                y: 50,
+                rotation: -5,
+                duration: 1,
+                scrollTrigger: {
+                    trigger: card,
+                    start: 'top bottom-=100',
+                    end: 'bottom center',
+                    toggleActions: 'play none none reverse'
+                }
+            });
+        });
+
+        // Parallax effect for award cards
+        gsap.utils.toArray('.award-card').forEach((card, i) => {
+            gsap.to(card, {
+                y: (i + 1) * -50,
+                ease: 'none',
+                scrollTrigger: {
+                    trigger: card,
+                    start: 'top bottom',
+                    end: 'bottom top',
+                    scrub: true
+                }
+            });
+        });
+
+        // (Keep the existing Three.js animations and interactions)
+
+    </script>
+</body>
+</html>
