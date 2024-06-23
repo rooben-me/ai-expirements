@@ -1,6 +1,7 @@
 import React, { useRef, useMemo, useEffect } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { EffectComposer, Bloom } from '@react-three/postprocessing'
+import { EffectComposer, Bloom, ChromaticAberration } from '@react-three/postprocessing'
+import { BlendFunction } from 'postprocessing'
 import * as THREE from 'three'
 
 const Node = ({ position, size, color }) => {
@@ -18,21 +19,8 @@ const Node = ({ position, size, color }) => {
 
 const Connection = ({ start, end }) => {
   const ref = useRef()
-  const curve = useMemo(() => {
-    const curveStart = new THREE.Vector3(...start)
-    const curveEnd = new THREE.Vector3(...end)
-    const midPoint = new THREE.Vector3().lerpVectors(curveStart, curveEnd, 0.5)
-    const randomOffset = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(0.5)
-    midPoint.add(randomOffset)
-    return new THREE.QuadraticBezierCurve3(curveStart, midPoint, curveEnd)
-  }, [start, end])
-
+  const curve = useMemo(() => new THREE.LineCurve3(new THREE.Vector3(...start), new THREE.Vector3(...end)), [start, end])
   const points = useMemo(() => curve.getPoints(50), [curve])
-
-  useFrame((state) => {
-    const t = (Math.sin(state.clock.elapsedTime * 2) + 1) / 2
-    ref.current.material.dashOffset = t * 10
-  })
 
   return (
     <line ref={ref}>
@@ -44,14 +32,32 @@ const Connection = ({ start, end }) => {
           itemSize={3}
         />
       </bufferGeometry>
-      <lineDashedMaterial color="#4fc3f7" dashSize={0.1} gapSize={0.05} />
+      <lineBasicMaterial color="#4fc3f7" transparent opacity={0.3} />
     </line>
+  )
+}
+
+const DataParticle = ({ start, end }) => {
+  const ref = useRef()
+  const curve = useMemo(() => new THREE.LineCurve3(new THREE.Vector3(...start), new THREE.Vector3(...end)), [start, end])
+  
+  useFrame((state) => {
+    const t = (state.clock.elapsedTime % 2) / 2
+    const position = curve.getPoint(t)
+    ref.current.position.copy(position)
+  })
+
+  return (
+    <mesh ref={ref}>
+      <sphereGeometry args={[0.02, 16, 16]} />
+      <meshBasicMaterial color="#ffffff" />
+    </mesh>
   )
 }
 
 const NeuralNetwork = () => {
   const nodes = useMemo(() => {
-    const nodeCount = 100
+    const nodeCount = 50
     return Array.from({ length: nodeCount }, () => [
       (Math.random() - 0.5) * 4,
       (Math.random() - 0.5) * 4,
@@ -60,7 +66,7 @@ const NeuralNetwork = () => {
   }, [])
 
   const connections = useMemo(() => {
-    const connectionCount = 150
+    const connectionCount = 100
     return Array.from({ length: connectionCount }, () => [
       Math.floor(Math.random() * nodes.length),
       Math.floor(Math.random() * nodes.length)
@@ -74,15 +80,20 @@ const NeuralNetwork = () => {
       <pointLight position={[10, 10, 10]} />
       
       {nodes.map((position, index) => (
-        <Node key={index} position={position} size={0.03} color="#4fc3f7" />
+        <Node key={index} position={position} size={0.05} color="#4fc3f7" />
       ))}
       
       {connections.map(([startIndex, endIndex], index) => (
         <Connection key={index} start={nodes[startIndex]} end={nodes[endIndex]} />
       ))}
+
+      {connections.map(([startIndex, endIndex], index) => (
+        <DataParticle key={index} start={nodes[startIndex]} end={nodes[endIndex]} />
+      ))}
       
       <EffectComposer>
-        <Bloom luminanceThreshold={0.1} intensity={0.5} levels={5} />
+        <Bloom luminanceThreshold={0.2} intensity={1.5} levels={5} />
+        <ChromaticAberration blendFunction={BlendFunction.NORMAL} offset={[0.0005, 0.0005]} />
       </EffectComposer>
     </Canvas>
   )
