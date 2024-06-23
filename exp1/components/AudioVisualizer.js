@@ -1,31 +1,72 @@
-import React, { useRef, useState, useEffect } from 'react'
+import React, { useRef, useState, useEffect, useMemo } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Cloud, Text } from '@react-three/drei'
+import { OrbitControls, Text, Stars } from '@react-three/drei'
 import { EffectComposer, Bloom, Noise, Vignette } from '@react-three/postprocessing'
 import * as THREE from 'three'
 
-const NebulaCloud = ({ position, color, scale, speed }) => {
-  const cloudRef = useRef()
+const AudioBar = ({ position, color, scale }) => {
+  const meshRef = useRef()
 
-  useFrame(({ clock }) => {
-    if (cloudRef.current) {
-      cloudRef.current.rotation.y = Math.sin(clock.getElapsedTime() * speed) * 0.2
-      cloudRef.current.rotation.x = Math.cos(clock.getElapsedTime() * speed) * 0.2
-      cloudRef.current.scale.setScalar(scale)
+  useFrame(() => {
+    if (meshRef.current) {
+      meshRef.current.scale.y = 1 + scale * 3
+      meshRef.current.position.y = (meshRef.current.scale.y - 1) / 2
     }
   })
 
   return (
-    <Cloud
-      ref={cloudRef}
-      position={position}
-      color={color}
-      opacity={0.5}
-      speed={0.4}
-      width={5}
-      depth={1.5}
-      segments={20}
-    />
+    <mesh ref={meshRef} position={position}>
+      <boxGeometry args={[0.3, 1, 0.3]} />
+      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.5} />
+    </mesh>
+  )
+}
+
+const WaveForm = ({ frequencies, color }) => {
+  const lineRef = useRef()
+  const curve = useMemo(() => new THREE.EllipseCurve(0, 0, 10, 10, 0, 2 * Math.PI, false, 0), [])
+  const points = useMemo(() => curve.getPoints(256), [curve])
+
+  const lineGeometry = useMemo(() => {
+    const geometry = new THREE.BufferGeometry().setFromPoints(points)
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Array(256 * 3).fill(0), 3))
+    return geometry
+  }, [points])
+
+  useFrame(() => {
+    if (lineRef.current) {
+      const positions = lineRef.current.geometry.attributes.position
+      for (let i = 0; i < 256; i++) {
+        const t = i / 255
+        const [x, y] = curve.getPoint(t).toArray()
+        const z = (frequencies[Math.floor(i / 2) % frequencies.length] / 255) * 2
+        positions.setXYZ(i, x, y, z)
+      }
+      positions.needsUpdate = true
+    }
+  })
+
+  return (
+    <line ref={lineRef} geometry={lineGeometry}>
+      <lineBasicMaterial color={color} linewidth={2} />
+    </line>
+  )
+}
+const AudioSphere = ({ frequencies }) => {
+  const sphereRef = useRef()
+
+  useFrame(() => {
+    if (sphereRef.current) {
+      const averageFrequency = frequencies.reduce((a, b) => a + b) / frequencies.length
+      sphereRef.current.scale.setScalar(1 + averageFrequency / 255)
+    }
+  })
+
+  return (
+    <mesh ref={sphereRef}>
+      <sphereGeometry args={[2, 32, 32]} />
+      <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.2} wireframe />
+    </mesh>
   )
 }
 
@@ -33,13 +74,7 @@ const AudioAnalyzer = ({ analyser, dataArray, setFrequencies }) => {
   useFrame(() => {
     if (analyser && dataArray) {
       analyser.getByteFrequencyData(dataArray)
-      const frequencies = []
-      for (let i = 0; i < 8; i++) {
-        const slice = dataArray.slice(i * 32, (i + 1) * 32)
-        const average = slice.reduce((a, b) => a + b, 0) / slice.length
-        frequencies.push(average)
-      }
-      setFrequencies(frequencies)
+      setFrequencies([...dataArray])
     }
   })
 
@@ -52,7 +87,7 @@ const AudioVisualizer = () => {
   const [dataArray, setDataArray] = useState(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [volume, setVolume] = useState(1)
-  const [frequencies, setFrequencies] = useState(new Array(8).fill(0))
+  const [frequencies, setFrequencies] = useState(new Array(128).fill(0))
 
   useEffect(() => {
     if (audio) {
@@ -128,30 +163,30 @@ const AudioVisualizer = () => {
           <span className="text-white">{Math.round(volume * 100)}%</span>
         </div>
       </div>
-      <Canvas camera={{ position: [0, 0, 20], fov: 75 }}>
+      <Canvas camera={{ position: [0, 0, 25], fov: 60 }}>
         <AudioAnalyzer
           analyser={analyser}
           dataArray={dataArray}
           setFrequencies={setFrequencies}
         />
         <color attach="background" args={['#000000']} />
-        <ambientLight intensity={0.5} />
-        <pointLight position={[10, 10, 10]} />
-        {frequencies.map((freq, index) => (
-          <NebulaCloud
-            key={index}
-            position={[
-              (index - 3.5) * 3,
-              Math.sin(index) * 2,
-              Math.cos(index) * 2
-            ]}
-            color={new THREE.Color().setHSL(index / 8, 1, 0.5)}
-            scale={1 + freq / 128}
-            speed={0.2 + index * 0.05}
-          />
-        ))}
+        <ambientLight intensity={0.2} />
+        <pointLight position={[10, 10, 10]} intensity={1} />
+        <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+        <group rotation={[0, 0, Math.PI / 2]}>
+          {frequencies.slice(0, 64).map((freq, index) => (
+            <AudioBar
+              key={index}
+              position={[(index - 32) * 0.3, 0, 0]}
+              color={new THREE.Color().setHSL(index / 64, 1, 0.5)}
+              scale={freq / 255}
+            />
+          ))}
+        </group>
+        <WaveForm frequencies={frequencies} color="#00ffff" />
+        <AudioSphere frequencies={frequencies} />
         <Text
-          position={[0, 8, 0]}
+          position={[0, 10, 0]}
           color="white"
           fontSize={1.5}
           maxWidth={200}
@@ -164,7 +199,7 @@ const AudioVisualizer = () => {
         >
           Audio Visualizer
         </Text>
-        <OrbitControls />
+        <OrbitControls enableZoom={false} enablePan={false} />
         <EffectComposer>
           <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} height={300} />
           <Noise opacity={0.02} />
