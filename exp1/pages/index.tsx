@@ -1,25 +1,13 @@
-import Image from "next/image";
-import { Inter } from "next/font/google";
-import dynamic from 'next/dynamic'
-import AudioVisualizer from '../components/AudioVisualizer'
-
-
-
-const NeuralNetwork = dynamic(() => import('../components/NeuralNetwork'), { ssr: false })
+import Link from "next/link";
 
 export default function Home() {
-  return (
-    /*
-    <div className="w-screen h-screen bg-gray-900">
-    <div className="absolute top-0 left-0 p-4 text-white z-10">
-      <h1 className="text-2xl font-bold mb-2">Neural Network Visualization</h1>
-      <p className="text-sm">Nodes represent neurons, lines are connections, and moving particles show data flow.</p>
-    </div>
-    <NeuralNetwork />
-  </div>
-   */
-  <div className="w-full h-screen">
-  <AudioVisualizer />
+  return (<div className="flex justify-evenly items-center min-h-screen">
+  
+<Link href="/audioviz1"><button className="px-4 py-2 bg-gray-800/50 text-white rounded-md border border-gray-200/20 hover:bg-gray-700/50 hover:border-gray-200/40 ease-in-out transition-all">Audio Viz 1</button></Link>   
+<Link href="/audioviz1-updated"><button className="px-4 py-2 bg-gray-800/50 text-white rounded-md border border-gray-200/20 hover:bg-gray-700/50 hover:border-gray-200/40 ease-in-out transition-all">Audio Viz 1 - updated</button></Link>   
+<Link href="/audioviz2"><button className="px-4 py-2 bg-gray-800/50 text-white rounded-md border border-gray-200/20 hover:bg-gray-700/50 hover:border-gray-200/40 ease-in-out transition-all">Audio Viz 2</button></Link>   
+<Link href="/neuralnet"><button className="px-4 py-2 bg-blue-800/50 text-white rounded-md border border-blue-200/20 hover:bg-blue-700/50 hover:border-blue-200/40 ease-in-out transition-all">Neural net</button></Link>   
+
 </div>
   );
  
