@@ -1,12 +1,16 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Text, Stars, useMatcapTexture } from '@react-three/drei'
-import { EffectComposer, Bloom, Noise, Vignette } from '@react-three/postprocessing'
+import { EffectComposer, Bloom, ChromaticAberration, Noise, Vignette, GodRays } from '@react-three/postprocessing'
+import { BlendFunction, Resizer, KernelSize } from 'postprocessing'
 import * as THREE from 'three'
 import { FaPlay, FaPause, FaForward, FaBackward } from 'react-icons/fa'
+import { MeshDistortMaterial } from '@react-three/drei'
+import { MeshTransmissionMaterial } from '@react-three/drei'
 
-const AudioBar = ({ position, color, scale }) => {
+const AudioBar = ({ position, frequency, index, totalBars }) => {
   const meshRef = useRef()
+  const scale = frequency / 255
 
   useFrame(() => {
     if (meshRef.current) {
@@ -17,11 +21,18 @@ const AudioBar = ({ position, color, scale }) => {
 
   return (
     <mesh ref={meshRef} position={position}>
-      <boxGeometry args={[0.3, 1, 0.3]} />
-      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.5} />
+      <boxGeometry args={[0.2, 1, 0.2]} />
+      <MeshDistortMaterial
+        color={new THREE.Color().setHSL(index / totalBars, 0.8, 0.5)}
+        emissive={new THREE.Color().setHSL(index / totalBars, 1, 0.5)}
+        emissiveIntensity={0.5 + scale}
+        distort={0.3 * scale}
+        speed={5}
+      />
     </mesh>
   )
 }
+
 
 const WaveForm = ({ frequencies, color }) => {
   const lineRef = useRef()
@@ -50,21 +61,35 @@ const WaveForm = ({ frequencies, color }) => {
   )
 }
 
-
 const AudioSphere = ({ frequencies }) => {
   const sphereRef = useRef()
+  const avgFrequency = frequencies.reduce((a, b) => a + b) / frequencies.length
+  
 
   useFrame(() => {
     if (sphereRef.current) {
-      const averageFrequency = frequencies.reduce((a, b) => a + b) / frequencies.length
-      sphereRef.current.scale.setScalar(1 + averageFrequency / 255)
+      sphereRef.current.scale.setScalar(1 + avgFrequency / 255 * 0.3)
+      sphereRef.current.rotation.y += 0.01
     }
   })
 
   return (
     <mesh ref={sphereRef}>
-      <sphereGeometry args={[2, 32, 32]} />
-      <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.2} wireframe />
+      <sphereGeometry args={[2, 64, 64]} />
+      <MeshTransmissionMaterial
+        backside
+        samples={4}
+        thickness={0.5}
+        roughness={0.1}
+        chromaticAberration={0.2}
+        anisotropy={0.3}
+        distortion={0.3}
+        distortionScale={0.2}
+        temporalDistortion={0.1}
+        iridescence={1}
+        iridescenceIOR={1}
+        iridescenceThicknessRange={[0, 1400]}
+      />
     </mesh>
   )
 }
@@ -88,6 +113,13 @@ const AudioVisualizer = () => {
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [frequencies, setFrequencies] = useState(new Array(128).fill(0))
+
+  const avgFrequency = useMemo(() => 
+    frequencies.reduce((sum, freq) => sum + freq, 0) / frequencies.length, 
+    [frequencies]
+  );
+
+  console.log(1 + avgFrequency / 255 * 0.3, "ave")
 
   useEffect(() => {
     if (audio) {
@@ -170,7 +202,7 @@ const AudioVisualizer = () => {
   }
 
   return (
-    <div className="w-full h-screen bg-gradient-to-b from-gray-900 to-black flex flex-col">
+    <div className="w-full h-screen flex flex-col">
       <div className="flex-grow">
         <Canvas camera={{ position: [0, 0, 25], fov: 60 }}>
           <AudioAnalyzer
@@ -181,18 +213,21 @@ const AudioVisualizer = () => {
           <color attach="background" args={['#000000']} />
           <ambientLight intensity={0.2} />
           <pointLight position={[10, 10, 10]} intensity={1} />
-          <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+          <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade />
+          <WaveForm frequencies={frequencies} color={"white"}/>
+          
           <group position={[0, -5, 0]}>
             {frequencies.slice(0, 64).map((freq, index) => (
               <AudioBar
                 key={index}
                 position={[(index - 32) * 0.3, 0, 0]}
-                color={new THREE.Color().setHSL(index / 64, 1, 0.5)}
-                scale={freq / 255}
+                frequency={freq}
+                index={index}
+                totalBars={64}
               />
             ))}
           </group>
-          <WaveForm frequencies={frequencies} color="#00ffff" />
+          
           <AudioSphere frequencies={frequencies} />
           
           <Text
@@ -209,19 +244,22 @@ const AudioVisualizer = () => {
           >
             Audio Visualizer
           </Text>
-          <OrbitControls
-            enableZoom={true}
-            autoRotate={true}
-            autoRotateSpeed={-0.1}
-            enablePan={true}
-            azimuth={[-Math.PI / 4, Math.PI / 4]}
-            zoomSpeed={0.15}
-            dampingFactor={0.05}
-          />
+          
+          <OrbitControls enableZoom={true} enablePan={true} enableRotate={true} />
+          
           <EffectComposer>
-            <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} height={300} />
+            <Bloom
+              intensity={0.5}
+              luminanceThreshold={0.2}
+              luminanceSmoothing={0.9}
+              height={300}
+            />
+            <ChromaticAberration
+              blendFunction={BlendFunction.NORMAL}
+            />
             <Noise opacity={0.02} />
             <Vignette eskil={false} offset={0.1} darkness={1.1} />
+            
           </EffectComposer>
         </Canvas>
       </div>
