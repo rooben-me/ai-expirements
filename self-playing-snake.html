@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Snake Game</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #000;
+            font-family: 'Press Start 2P', cursive;
+            color: #fff;
+        }
+        #game-container {
+            text-align: center;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+        }
+        #gameCanvas {
+            border: 2px solid #0f0;
+            border-radius: 5px;
+        }
+        #score, #high-score {
+            font-size: 18px;
+            margin-top: 10px;
+            text-shadow: 0 0 5px #0f0;
+        }
+        #high-score {
+            color: #f0f;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+        <div id="score">Score: 0</div>
+        <div id="high-score">High Score: 0</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const highScoreElement = document.getElementById('high-score');
+
+        const gridSize = 20;
+        const tileCount = canvas.width / gridSize;
+
+        let snake = [{ x: 10, y: 10 }];
+        let food = getRandomFoodPosition();
+        let dx = 0;
+        let dy = 0;
+        let score = 0;
+        let highScore = 0;
+
+        function getRandomFoodPosition() {
+            return {
+                x: Math.floor(Math.random() * tileCount),
+                y: Math.floor(Math.random() * tileCount)
+            };
+        }
+
+        function drawGame() {
+            clearCanvas();
+            moveSnake();
+            checkCollision();
+            drawSnake();
+            drawFood();
+            updateScore();
+            chooseDirection();
+            requestAnimationFrame(drawGame);
+        }
+
+        function clearCanvas() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function moveSnake() {
+            const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+            snake.unshift(head);
+            if (head.x === food.x && head.y === food.y) {
+                score++;
+                food = getRandomFoodPosition();
+            } else {
+                snake.pop();
+            }
+        }
+
+        function checkCollision() {
+            const head = snake[0];
+            if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
+                resetGame();
+            }
+            for (let i = 1; i < snake.length; i++) {
+                if (head.x === snake[i].x && head.y === snake[i].y) {
+                    resetGame();
+                }
+            }
+        }
+
+        function drawSnake() {
+            snake.forEach((segment, index) => {
+                const hue = (120 + index * 5) % 360;
+                ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
+                ctx.shadowColor = `hsl(${hue}, 100%, 50%)`;
+                ctx.shadowBlur = 10;
+                ctx.fillRect(segment.x * gridSize, segment.y * gridSize, gridSize - 2, gridSize - 2);
+                ctx.shadowBlur = 0;
+            });
+        }
+
+        function drawFood() {
+            ctx.fillStyle = '#f00';
+            ctx.shadowColor = '#f00';
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.arc((food.x + 0.5) * gridSize, (food.y + 0.5) * gridSize, gridSize / 2 - 2, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+        function updateScore() {
+            scoreElement.textContent = `Score: ${score}`;
+            if (score > highScore) {
+                highScore = score;
+                highScoreElement.textContent = `High Score: ${highScore}`;
+            }
+        }
+
+        function resetGame() {
+            snake = [{ x: 10, y: 10 }];
+            food = getRandomFoodPosition();
+            dx = 0;
+            dy = 0;
+            score = 0;
+        }
+
+        function chooseDirection() {
+            const head = snake[0];
+            const possibleMoves = [
+                { dx: -1, dy: 0 },
+                { dx: 1, dy: 0 },
+                { dx: 0, dy: -1 },
+                { dx: 0, dy: 1 }
+            ];
+
+            const validMoves = possibleMoves.filter(move => {
+                const newX = head.x + move.dx;
+                const newY = head.y + move.dy;
+                return newX >= 0 && newX < tileCount && newY >= 0 && newY < tileCount &&
+                       !snake.some(segment => segment.x === newX && segment.y === newY);
+            });
+
+            if (validMoves.length > 0) {
+                const bestMove = validMoves.reduce((best, move) => {
+                    const distanceToFood = Math.abs(food.x - (head.x + move.dx)) + Math.abs(food.y - (head.y + move.dy));
+                    return distanceToFood < best.distance ? { move, distance: distanceToFood } : best;
+                }, { distance: Infinity }).move;
+
+                dx = bestMove.dx;
+                dy = bestMove.dy;
+            }
+        }
+
+        drawGame();
+    </script>
+</body>
+</html>
