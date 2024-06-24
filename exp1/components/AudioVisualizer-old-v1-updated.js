@@ -1,65 +1,90 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Text, Stars, useMatcapTexture } from '@react-three/drei'
-import { EffectComposer, Bloom, ChromaticAberration, Noise, Vignette, GodRays } from '@react-three/postprocessing'
+import { OrbitControls, Text, Stars, useMatcapTexture, Sparkles } from '@react-three/drei'
+import { EffectComposer, Bloom, ChromaticAberration, Noise, Vignette, GodRays, Glitch } from '@react-three/postprocessing'
 import { BlendFunction, Resizer, KernelSize } from 'postprocessing'
 import * as THREE from 'three'
 import { FaPlay, FaPause, FaForward, FaBackward } from 'react-icons/fa'
 import { MeshDistortMaterial } from '@react-three/drei'
 import { MeshTransmissionMaterial } from '@react-three/drei'
 
-const AudioBar = ({ position, frequency, index, totalBars }) => {
-  const meshRef = useRef()
-  const scale = frequency / 255
+const AudioBar = ({ index, frequency, totalBars }) => {
+  const meshRef = useRef();
+  const scale = frequency / 255;
+
+  const color = useMemo(() => {
+    return new THREE.Color().setHSL(index / totalBars, 0.8, 0.5);
+  }, [index, totalBars]);
 
   useFrame(() => {
     if (meshRef.current) {
-      meshRef.current.scale.y = 1 + scale * 3
-      meshRef.current.position.y = (meshRef.current.scale.y - 1) / 2
+      meshRef.current.scale.y = 1 + scale * 3;
+      meshRef.current.position.y = (meshRef.current.scale.y - 1) / 2;
     }
-  })
+  });
+
+  const barWidth = 0.2;
+  const spacing = 0.1;
+  const totalWidth = totalBars * (barWidth + spacing);
+  const startX = -totalWidth / 2;
+
+  const position = useMemo(() => {
+    const x = startX + index * (barWidth + spacing);
+    return [x, 0, 0];
+  }, [index, startX, barWidth, spacing]);
 
   return (
     <mesh ref={meshRef} position={position}>
-      <boxGeometry args={[0.2, 1, 0.2]} />
+      <boxGeometry args={[barWidth, 1, barWidth]} />
       <MeshDistortMaterial
-        color={new THREE.Color().setHSL(index / totalBars, 0.8, 0.5)}
-        emissive={new THREE.Color().setHSL(index / totalBars, 1, 0.5)}
+        color={color}
+        emissive={color}
         emissiveIntensity={0.5 + scale}
         distort={0.3 * scale}
         speed={5}
+        metalness={0.5}
+        roughness={0.2}
       />
     </mesh>
-  )
-}
-
+  );
+};
 
 const WaveForm = ({ frequencies, color }) => {
-  const lineRef = useRef()
-  const points = useMemo(() => new Array(256).fill().map((_, i) => new THREE.Vector3(i / 255 * 20 - 10, 0, 0)), [])
+  const lineRef = useRef();
+  const mirroredFrequencies = useMemo(() => {
+    const half = frequencies.slice(0, frequencies.length / 2);
+    return [...half, ...half.slice().reverse()];
+  }, [frequencies]);
+
+  const points = useMemo(() => {
+    const totalPoints = mirroredFrequencies.length;
+    return new Array(totalPoints).fill().map((_, i) => {
+      const x = (i / (totalPoints - 1)) * 20 - 10;
+      return new THREE.Vector3(x, 0, 0);
+    });
+  }, [mirroredFrequencies.length]);
 
   const lineGeometry = useMemo(() => {
-    const geometry = new THREE.BufferGeometry().setFromPoints(points)
-    return geometry
-  }, [points])
+    return new THREE.BufferGeometry().setFromPoints(points);
+  }, [points]);
 
   useFrame(() => {
     if (lineRef.current) {
-      const positions = lineRef.current.geometry.attributes.position
-      for (let i = 0; i < 256; i++) {
-        const y = (frequencies[Math.floor(i / 2) % frequencies.length] / 255) * 2
-        positions.setY(i, y)
+      const positions = lineRef.current.geometry.attributes.position;
+      for (let i = 0; i < mirroredFrequencies.length; i++) {
+        const y = (mirroredFrequencies[i] / 255) * 2;
+        positions.setY(i, y);
       }
-      positions.needsUpdate = true
+      positions.needsUpdate = true;
     }
-  })
+  });
 
   return (
     <line ref={lineRef} geometry={lineGeometry}>
       <lineBasicMaterial color={color} linewidth={2} />
     </line>
-  )
-}
+  );
+};
 
 const AudioSphere = ({ frequencies }) => {
   const sphereRef = useRef()
@@ -68,7 +93,7 @@ const AudioSphere = ({ frequencies }) => {
 
   useFrame(() => {
     if (sphereRef.current) {
-      sphereRef.current.scale.setScalar(1 + avgFrequency / 255 * 0.3)
+      sphereRef.current.scale.setScalar(1 + avgFrequency / 255 * 0.5)
       sphereRef.current.rotation.y += 0.01
     }
   })
@@ -114,12 +139,10 @@ const AudioVisualizer = () => {
   const [duration, setDuration] = useState(0)
   const [frequencies, setFrequencies] = useState(new Array(128).fill(0))
 
-  const avgFrequency = useMemo(() => 
-    frequencies.reduce((sum, freq) => sum + freq, 0) / frequencies.length, 
-    [frequencies]
-  );
-
-  console.log(1 + avgFrequency / 255 * 0.3, "ave")
+  // const avgFrequency = useMemo(() => 
+  //   frequencies.reduce((sum, freq) => sum + freq, 0) / frequencies.length, 
+  //   [frequencies]
+  // );
 
   useEffect(() => {
     if (audio) {
@@ -216,7 +239,7 @@ const AudioVisualizer = () => {
           <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade />
           <WaveForm frequencies={frequencies} color={"white"}/>
           
-          <group position={[0, -5, 0]}>
+          <group position={[0, -3.5, 0]}>
             {frequencies.slice(0, 64).map((freq, index) => (
               <AudioBar
                 key={index}
