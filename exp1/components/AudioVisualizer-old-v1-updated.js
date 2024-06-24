@@ -7,6 +7,7 @@ import * as THREE from 'three'
 import { FaPlay, FaPause, FaForward, FaBackward } from 'react-icons/fa'
 import { MeshDistortMaterial } from '@react-three/drei'
 import { MeshTransmissionMaterial } from '@react-three/drei'
+import AudioSphere from "./audioviz/AudioSphere"
 
 const AudioBar = ({ index, frequency, totalBars }) => {
   const meshRef = useRef();
@@ -85,39 +86,6 @@ const WaveForm = ({ frequencies, color }) => {
     </line>
   );
 };
-
-const AudioSphere = ({ frequencies }) => {
-  const sphereRef = useRef()
-  const avgFrequency = frequencies.reduce((a, b) => a + b) / frequencies.length
-  
-
-  useFrame(() => {
-    if (sphereRef.current) {
-      sphereRef.current.scale.setScalar(1 + avgFrequency / 255 * 0.5)
-      sphereRef.current.rotation.y += 0.01
-    }
-  })
-
-  return (
-    <mesh ref={sphereRef}>
-      <sphereGeometry args={[2, 64, 64]} />
-      <MeshTransmissionMaterial
-        backside
-        samples={4}
-        thickness={0.5}
-        roughness={0.1}
-        chromaticAberration={0.2}
-        anisotropy={0.3}
-        distortion={0.3}
-        distortionScale={0.2}
-        temporalDistortion={0.1}
-        iridescence={1}
-        iridescenceIOR={1}
-        iridescenceThicknessRange={[0, 1400]}
-      />
-    </mesh>
-  )
-}
 
 const AudioAnalyzer = ({ analyser, dataArray, setFrequencies }) => {
   useFrame(() => {
